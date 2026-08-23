@@ -181,7 +181,11 @@ class EPaperWriter:
     def shutdown(self):
         self.stop_flag = True
         if self.thread.is_alive():
-            self.thread.join(timeout=25)
+            # 4色パネルのフルカラー画像(シャットダウンロゴ等)の描画は
+            # 25秒では終わらないことがあり、タイムアウトすると描画未完了の
+            # まま epd.sleep() が呼ばれて亀ロゴが表示されずに終了してしまう。
+            # 余裕を持って60秒待つ。
+            self.thread.join(timeout=60)
         if self.enabled and self.epd:
             try:
                 self.epd.sleep()
@@ -391,6 +395,10 @@ class ZenEditor:
         except ai_convert.AiConvertError as e:
             ai_status = f"AI変換失敗(未変換のまま送信): {e}"
 
+        # 変換結果をe-paperにも反映する。モニター無しの本番運用では、
+        # これが送信前に内容を確認できる唯一の手段になる。
+        self.push_to_epaper()
+
         self.status = f"{ai_status} / Git送信中..."
         self.render()
 
@@ -400,8 +408,10 @@ class ZenEditor:
             result_holder["msg"] = msg
 
         GitSync.send(INBOX_DIR, cb)
-        self.status = f"{ai_status} / {result_holder.get('msg', '')}"
+        final_msg = f"{ai_status} / {result_holder.get('msg', '')}"
+        self.status = final_msg
         self.render()
+        self.epaper.request([final_msg])
         time.sleep(1.5)  # 結果をひと呼吸見せてから画面をリセットする
 
         self.reset_document()
@@ -580,6 +590,14 @@ class ZenEditor:
                 break
             elif code == 19:  # Ctrl+S
                 self.save(as_new=False)
+            elif code == 4:  # Ctrl+D: e-paperの画面更新のみを明示的に行う
+                # 通常の文字入力(Enter含む)からは独立させている。日本語入力で
+                # Enterの頻度が上がっても、e-paperの重い描画を毎回走らせない
+                # ようにするため。
+                if self.skk_enabled:
+                    self.flush_romaji_buf()
+                self.push_to_epaper()
+                self.status = "e-paperを更新しました"
             elif code == 14:  # Ctrl+N: 未保存なら保存してから、新規原稿へ(画面クリア)
                 if self.skk_enabled:
                     self.flush_romaji_buf()
@@ -695,7 +713,9 @@ class ZenEditor:
         self.cy += 1
         self.cx = 0
         self.dirty = True
-        self.push_to_epaper()
+        # e-paperの更新はここでは行わない(Ctrl+Dで明示的に行う)。
+        # 日本語入力では変換確定のためにEnterを押す頻度が英語入力より
+        # 高くなりがちで、毎回e-paperの重い描画が走ると実用に耐えない。
 
     def move_up(self):
         if self.cy > 0:
@@ -774,7 +794,7 @@ class ZenEditor:
         skk_tag = f"[日本語:{'ON' if self.skk_enabled else 'off'}]"
         if self.skk_enabled and self.romaji_buf:
             skk_tag += f"({self.romaji_buf})"
-        info = f"{fname}{dirty_mark}  [{self.cy+1}:{self.cx+1}]  {skk_tag}  Ctrl+S保存 Ctrl+N新規原稿 Ctrl+G AI変換+送信 Ctrl+K日本語 Ctrl+Q終了"
+        info = f"{fname}{dirty_mark}  [{self.cy+1}:{self.cx+1}]  {skk_tag}  Ctrl+S保存 Ctrl+D画面更新 Ctrl+N新規原稿 Ctrl+G AI変換+送信 Ctrl+K日本語 Ctrl+Q終了"
         try:
             self.stdscr.addstr(h - 2, 0, info[:w - 1], curses.A_REVERSE)
             self.stdscr.addstr(h - 1, 0, self.status[:w - 1])

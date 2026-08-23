@@ -15,7 +15,19 @@ scp ~/Downloads/<ファイル名> pagos@192.168.1.191:~/pagos_writer-deck/
 cd ~/pagos_writer-deck
 python3 zen_editor.py
 ~~~
-終了は Ctrl+Q
+Ctrl+S保存 / Ctrl+D e-paper更新 / Ctrl+N新規原稿 / Ctrl+G AI変換+送信 / Ctrl+K日本語入力 / Ctrl+Q終了
+(2026-08-24: Ctrl+Dを新設。Enterキー押下では自動でe-paperを更新しなくなった。
+必ずCtrl+Dを押すこと)
+
+## mozcローカル変換のテスト(未検証、要動作確認)
+~~~
+sudo apt install -y emacs-mozc-bin
+cd ~/pagos_writer-deck
+python3 mozc_convert.py "きょうはいいてんきですね"
+~~~
+成功すれば漢字仮名交じり文が出力される。失敗した場合は`mozc_convert.log`
+を確認すること。動作確認できたら`ai_convert.py`の`AI_BACKEND`を
+`"mozc_local"`に変更するとCtrl+Gでも使われるようになる。
 
 ## 電源状態の確認
 ~~~

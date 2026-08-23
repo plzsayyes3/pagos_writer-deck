@@ -3,12 +3,19 @@
 """
 ひらがな主体の文章を、自然な漢字仮名交じり文に変換してもらう。
 
-2つのバックエンドを切り替え可能:
+3つのバックエンドを切り替え可能:
 - "ollama": Mac上に常駐しているローカルLLM。プライベートな内容でも外部に
   送らず、同じLAN内だけで完結する。ただし7Bクラスのモデルでは変換精度に
   限界があり、稀に単語自体を書き換えてしまう(ハルシネーション)ことがある。
 - "gemini": Google Gemini API(クラウド)。精度は高いが、文章がGoogleの
   サーバーに送信される。**本当にプライベートな内容を書く時は使わないこと。**
+- "mozc_local": mozc_emacs_helper経由でmozcの変換エンジンをGUI無しで直接
+  叩き、変換候補の先頭(第一候補)で機械的に確定する方式。完全ローカル・
+  オフラインでネット接続もAPIキーも不要。GUI実験(fcitx5-mozc)でmozcの
+  変換自体はこの機体で動くことを確認済みだが、候補選択UIそのものは
+  電子ペーパーに乗せられないため、UIを介さずエンジンだけを叩く方式。
+  **mozc_convert.py側がまだ実機で動作検証できていないため、実際に使う
+  前に `python3 mozc_convert.py "てすと"` で単体テストすること。**
 
 AI_BACKENDの値を書き換えるだけで切り替えられる。
 """
@@ -17,6 +24,11 @@ import os
 import urllib.request
 import urllib.error
 from datetime import datetime
+
+try:
+    import mozc_convert
+except ImportError:
+    mozc_convert = None
 
 # モニター無しの実機でも、後からSSHで原因を確認できるよう、
 # 変換の成功/失敗をこのログファイルに必ず記録する。
@@ -30,7 +42,7 @@ def _log(msg):
     except Exception:
         pass
 
-AI_BACKEND = "gemini"  # "ollama" または "gemini"
+AI_BACKEND = "gemini"  # "ollama" / "gemini" / "mozc_local"
 
 # ---- Ollama(ローカルLLM)設定 ----
 OLLAMA_HOST = "192.168.1.139"
@@ -80,6 +92,8 @@ def convert_to_kanji(text):
     try:
         if AI_BACKEND == "gemini":
             result = _convert_via_gemini(text)
+        elif AI_BACKEND == "mozc_local":
+            result = _convert_via_mozc_local(text)
         else:
             result = _convert_via_ollama(text)
         cleaned = _sanity_check_and_clean(text, result)
@@ -113,6 +127,21 @@ def _sanity_check_and_clean(text, result):
         result = result[1:-1].strip()
 
     return result
+
+
+def _convert_via_mozc_local(text):
+    """mozc_emacs_helper経由でmozcの変換エンジンを直接叩き、第一候補選択で
+    確定する。完全ローカル・オフラインで、ネットワークにもGemini APIキーにも
+    依存しない。詳細はmozc_convert.pyのモジュールdocstringを参照。"""
+    if mozc_convert is None:
+        raise AiConvertError(
+            "mozc_convert.pyのimportに失敗しました。"
+            "zen_editor.pyと同じディレクトリにmozc_convert.pyがあるか確認してください"
+        )
+    try:
+        return mozc_convert.convert_to_kanji_via_mozc(text)
+    except mozc_convert.MozcConvertError as e:
+        raise AiConvertError(f"mozc変換エラー: {e}")
 
 
 def _convert_via_ollama(text):
