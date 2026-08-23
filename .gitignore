@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+zen_editor.log
+zen_editor_crash.log
+power_log.csv
+SKK-JISYO.L
+ai_convert.log
