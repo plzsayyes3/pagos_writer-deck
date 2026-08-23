@@ -19,15 +19,16 @@ Ctrl+S保存 / Ctrl+D e-paper更新 / Ctrl+N新規原稿 / Ctrl+G AI変換+送�
 (2026-08-24: Ctrl+Dを新設。Enterキー押下では自動でe-paperを更新しなくなった。
 必ずCtrl+Dを押すこと)
 
-## mozcローカル変換のテスト(未検証、要動作確認)
+## mozcローカル変換のテスト(Docker上で動作検証済み、実機でも高確度で動く見込み)
 ~~~
 sudo apt install -y emacs-mozc-bin
 cd ~/pagos_writer-deck
 python3 mozc_convert.py "きょうはいいてんきですね"
 ~~~
-成功すれば漢字仮名交じり文が出力される。失敗した場合は`mozc_convert.log`
-を確認すること。動作確認できたら`ai_convert.py`の`AI_BACKEND`を
-`"mozc_local"`に変更するとCtrl+Gでも使われるようになる。
+成功すれば「今日はいい天気ですね」のような漢字仮名交じり文が出力される。
+失敗した場合は`mozc_convert.log`を確認すること。動作確認できたら
+`ai_convert.py`の`AI_BACKEND`を`"mozc_local"`に変更するとCtrl+Gでも
+使われるようになる(ネット接続・APIキー不要、完全ローカル)。
 
 ## 電源状態の確認
 ~~~
