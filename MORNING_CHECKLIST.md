@@ -60,6 +60,12 @@ python3 mozc_convert.py "きょうはいいてんきですね"
 Dockerでの検証がベースにあるので、直すとしても軽微な差分(armhf固有の
 パス違いなど)で済むはず。
 
+**追記**: `mozc_convert.py`単体だけでなく、`ai_convert.py`の
+`convert_to_kanji()`(Ctrl+Gが実際に呼ぶ関数そのもの)に`AI_BACKEND =
+"mozc_local"`を設定して呼び出すところまで、Docker上で通しでテスト済み。
+「きょうはにほんごにゅうりょくのじっけんをしました」→「今日は日本語入力の
+実験をしました」のように、改行や長文でも正しく動くことを確認した。
+
 ### 動作確認できたら
 `ai_convert.py`の`AI_BACKEND = "gemini"`を`AI_BACKEND = "mozc_local"`に
 書き換える。Ctrl+Gでもmozcのローカル変換が使われ、Gemini APIキー・ネット
