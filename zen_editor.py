@@ -204,13 +204,27 @@ class EPaperWriter:
             self.busy = False
 
     def shutdown(self):
+        # 【重要】stop_flagを先に立ててからjoinすると、ワーカースレッドが
+        # ちょうど time.sleep(0.2) から戻って while ループの先頭でstop_flagを
+        # 見た瞬間にTrueになっていて、直前にenqueueされた保留中の描画
+        # (シャットダウンロゴ等)を一度も処理せずループを抜けてしまう
+        # レースコンディションがあった(epaper.logで「request_custom受付」の
+        # 後に「描画開始」が出ないまま終わる、という形で発覚)。
+        # そのため、まず保留中の描画が実際に始まって完了するのを待ってから
+        # stop_flagを立てるようにする。
+        _epaper_log("shutdown: 保留中の描画の完了待ち開始")
+        deadline = time.time() + 60
+        while time.time() < deadline:
+            with self.lock:
+                pending = self.pending_draw_fn is not None or self.pending_lines is not None
+            if not pending and not self.busy:
+                break
+            time.sleep(0.2)
+        _epaper_log("shutdown: 保留中の描画の完了待ち終了、停止処理へ")
+
         self.stop_flag = True
         if self.thread.is_alive():
-            # 4色パネルのフルカラー画像(シャットダウンロゴ等)の描画は
-            # 25秒では終わらないことがあり、タイムアウトすると描画未完了の
-            # まま epd.sleep() が呼ばれて亀ロゴが表示されずに終了してしまう。
-            # 余裕を持って60秒待つ。
-            self.thread.join(timeout=60)
+            self.thread.join(timeout=10)
         if self.enabled and self.epd:
             try:
                 self.epd.sleep()
