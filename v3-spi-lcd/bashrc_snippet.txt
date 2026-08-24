@@ -1,0 +1,24 @@
+# ~/.bashrc に追記する自動起動ブロック(V3用)。
+# 既存のCUI版(zen_editor.py)の自動起動ブロックとは"どちらか一方"しか
+# 有効にできない(同じtty1上で同時に2つは起動できないため)。
+# V3を試す間は、既存の
+#   if [ -z "$SSH_CONNECTION" ] && [ "$(tty)" = "/dev/tty1" ]; then
+#       cd ~/pagos_writer-deck
+#       python3 zen_editor.py
+#   fi
+# をコメントアウトし、代わりに以下を有効にすること。
+
+if [ -z "$SSH_CONNECTION" ] && [ "$(tty)" = "/dev/tty1" ]; then
+    export FRAMEBUFFER=/dev/fb1
+    # 起動スプラッシュ(パゴス+亀ロゴ)をフレームバッファに直接表示し、
+    # 何かキーが押されるまで待つ。CUI版のshow_splash()と同じ思想:
+    # 「準備完了」がすぐ視覚的に分かるようにするため、X11の起動(数秒かかる)
+    # を待たずに先に画像だけ出す。
+    fbi -T 1 -a --once -noverbose -d /dev/fb1 \
+        ~/pagos_writer-deck/v3-spi-lcd/splash.png &
+    FBI_PID=$!
+    read -n 1 -s -r
+    kill "$FBI_PID" 2>/dev/null
+    cd ~/pagos_writer-deck
+    startx 2> ~/xorg_errors.log
+fi

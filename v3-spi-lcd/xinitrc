@@ -1,0 +1,17 @@
+#!/bin/sh
+# V3(OSOYOO 3.5inch SPI LCD, 480x320)用 .xinitrc
+# V2(HDMI+fcitx5-mozc)実験で得た教訓をそのまま踏襲している:
+#   - 「source」はdashで使えないので「.」を使う(これでハマった)
+#   - dbus-launchが無いとfcitx5が起動しない
+#   - waylandアドオンは無効化しておく(ハングすることがあった)
+eval $(dbus-launch --sh-syntax --exit-with-session)
+xset s off
+xset -dpms
+xset s noblank
+. ~/.xprofile
+xsetroot -solid "#f8f6ec"
+# 画面が480x320と小さいため、ウィンドウはほぼ全画面(ピクセル指定)で配置する。
+# --geometryはGTK3標準オプションのはずだが、実機でサイズが合わなければ
+# openboxのウィンドウ最大化キーバインド(デフォルトA-F5等)を使う手もある。
+mousepad --geometry=470x290+3+3 ~/pagos_gui_draft.md &
+exec openbox-session

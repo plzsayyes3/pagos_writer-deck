@@ -1,0 +1,18 @@
+# V3(OSOYOO 3.5inch SPI LCD)用の /boot/firmware/config.txt 追記分。
+# OSOYOO公式のRaspberry Pi OS Trixie向け手順(2026-02-09版)に準拠。
+#
+# 適用方法:
+#   1. 既存の config.txt にある以下2行をコメントアウトする(先頭に # を付ける):
+#        dtoverlay=vc4-kms-v3d
+#        max_framebuffers=2
+#      (V2のGUI実験で vc4-fkms-v3d に変えていた場合も同様にコメントアウトする。
+#       このLCDはKMS/DRMを使わない旧来のfbtft方式のドライバのため)
+#   2. 以下の内容をファイル末尾に追記する
+
+dtparam=spi=on
+dtoverlay=osoyoo35b:speed=20000000
+hdmi_force_hotplug=1
+hdmi_group=2
+hdmi_mode=87
+hdmi_cvt 480 320 60 6 0 0 0
+display_rotate=2
