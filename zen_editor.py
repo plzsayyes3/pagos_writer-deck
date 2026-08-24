@@ -263,17 +263,26 @@ def _draw_logo_image(epd, Image, ImageDraw, ImageFont, sub_text):
     """logo.png(ユーザー提供のPAGOSロゴ画像、4色パネル用に減色済み)を
     読み込み、下の余白にsub_textを描いて表示する。起動時のスプラッシュ
     画面(show_splash)と終了時のシャットダウン画面(draw_shutdown_image)
-    の両方から共通で使う。"""
-    img = Image.open(LOGO_PATH).convert("RGB")
+    の両方から共通で使う。
+
+    このライターデックは横向き(landscape)運用のため、logo.pngは
+    実際に目に見える向き(416x240、亀が左・PAGOSの文字が右)のまま作って
+    ある。ただしe-paperドライバの内部バッファは240x416(縦長)を要求する
+    仕様のため、ここで90度回転させてから渡す。回転方向は実機で目視確認
+    しながら決めたもの(逆向きに見える場合はrotate()の角度を90→-90に
+    変更すること)。"""
+    img = Image.open(LOGO_PATH).convert("RGB")  # 416x240、見た目通りの向き
     draw = ImageDraw.Draw(img)
     if sub_text:
-        font = ImageFont.truetype(FONT_PATH, 16)
+        font = ImageFont.truetype(FONT_PATH, 20)
         bbox = draw.textbbox((0, 0), sub_text, font=font)
         tw = bbox[2] - bbox[0]
         x = max(0, (img.width - tw) // 2)
-        y = img.height - 28
+        y = img.height - 40
         draw.text((x, y), sub_text, font=font, fill=epd.BLACK)
-    epd.display(epd.getbuffer(img))
+    # 240x416(縦長)のバッファ形式に回転して合わせる
+    rotated = img.rotate(90, expand=True)
+    epd.display(epd.getbuffer(rotated))
 
 
 class GitSync:
