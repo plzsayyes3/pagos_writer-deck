@@ -24,6 +24,18 @@ import ai_convert
 
 locale.setlocale(locale.LC_ALL, '')
 
+EPAPER_LOG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "epaper.log")
+
+
+def _epaper_log(msg):
+    # モニター無し・物理キーボードのみの運用では、e-paper更新が成功したか
+    # 失敗したかを画面上で確認する手段が無いため、必ずファイルに記録する。
+    try:
+        with open(EPAPER_LOG_PATH, "a", encoding="utf-8") as f:
+            f.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {msg}\n")
+    except Exception:
+        pass
+
 
 def display_width(s):
     """日本語などの全角文字は端末上で2マス分の幅を占めるため、
@@ -108,20 +120,25 @@ class EPaperWriter:
         self.thread.start()
 
     def _init_epd(self):
+        _epaper_log("epd初期化開始")
         try:
             self.epd = epd3in7g.EPD()
             self.epd.init()
             self.epd.Clear()
             self.font = ImageFont.truetype(FONT_PATH, 24)
             self.ready = True
+            _epaper_log("epd初期化成功")
         except Exception as e:
             self.enabled = False
             self.error = str(e)
+            _epaper_log(f"epd初期化失敗: {type(e).__name__}: {e}")
 
     def request(self, lines):
         """描画したい行のリストを渡す(非ブロッキング)。"""
         if not self.enabled:
+            _epaper_log(f"request無視(enabled=False, error={self.error})")
             return
+        _epaper_log(f"request受付 {len(lines)}行")
         with self.lock:
             self.pending_lines = list(lines)
             self.pending_draw_fn = None
@@ -132,7 +149,9 @@ class EPaperWriter:
         スレッド側で呼び出される。draw_fn内で最終的にepd.display(...)まで
         自分で行うこと。"""
         if not self.enabled:
+            _epaper_log(f"request_custom無視(enabled=False, error={self.error})")
             return
+        _epaper_log("request_custom受付")
         with self.lock:
             self.pending_draw_fn = draw_fn
             self.pending_lines = None
@@ -153,9 +172,12 @@ class EPaperWriter:
             if draw_fn is not None:
                 try:
                     self.busy = True
+                    _epaper_log("request_custom描画開始")
                     draw_fn(self.epd, Image, ImageDraw, ImageFont)
+                    _epaper_log("request_custom描画完了")
                 except Exception as e:
                     self.error = str(e)
+                    _epaper_log(f"request_custom描画失敗: {type(e).__name__}: {e}")
                 finally:
                     self.busy = False
             elif lines is not None:
@@ -166,6 +188,7 @@ class EPaperWriter:
     def _draw(self, lines):
         try:
             self.busy = True
+            _epaper_log("_draw開始")
             img = Image.new('RGB', (self.epd.height, self.epd.width), self.epd.WHITE)
             draw = ImageDraw.Draw(img)
             y = 8
@@ -173,8 +196,10 @@ class EPaperWriter:
                 draw.text((8, y), line, font=self.font, fill=self.epd.BLACK)
                 y += 30
             self.epd.display(self.epd.getbuffer(img))
+            _epaper_log("_draw完了")
         except Exception as e:
             self.error = str(e)
+            _epaper_log(f"_draw失敗: {type(e).__name__}: {e}")
         finally:
             self.busy = False
 
