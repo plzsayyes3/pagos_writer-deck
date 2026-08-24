@@ -372,6 +372,7 @@ class ZenEditor:
         self.status = ""
         self.undo_stack = []
         self.epaper = EPaperWriter()
+        self.want_poweroff = False     # Ctrl+Qで終了した時にTrueになる。main()側でPiの電源を落とすかの判定に使う
 
         # ---- 日本語入力(ローマ字→ひらがな)の状態 ----
         # 漢字変換はローカルLLM(ai_convert.py)にCtrl+Gでまとめて任せる方式のため、
@@ -635,6 +636,11 @@ class ZenEditor:
                     if ans.lower() == "y":
                         self.save()
                 self.draw_shutdown_image()
+                # モニター無し運用では、Ctrl+Q後にbashへ戻ってもコマンドを
+                # 打つ手段が無い。ここでフラグを立て、main()側でロゴ描画
+                # 完了(editor.shutdown()完了)を待ってから実際にPiの電源を
+                # 落とす。
+                self.want_poweroff = True
                 break
             elif code == 19:  # Ctrl+S
                 self.save(as_new=False)
@@ -883,6 +889,7 @@ def main(stdscr):
         editor.run()
     finally:
         editor.shutdown()
+    return editor.want_poweroff
 
 
 if __name__ == "__main__":
@@ -891,8 +898,9 @@ if __name__ == "__main__":
     # そのため出力先は変えず、クラッシュした場合だけこのスクリプト自身が
     # ログファイルに記録する。curses.wrapper()は例外発生時も端末の状態を
     # 元に戻してから例外を外に投げるので、ここで受け取っても画面は壊れない。
+    want_poweroff = False
     try:
-        curses.wrapper(main)
+        want_poweroff = curses.wrapper(main)
     except Exception:
         import traceback
         crash_log = os.path.join(SCRIPT_DIR, "zen_editor_crash.log")
@@ -900,3 +908,12 @@ if __name__ == "__main__":
             f.write(f"\n--- crash at {datetime.now()} ---\n")
             traceback.print_exc(file=f)
         raise
+
+    # Ctrl+Qで終了した場合のみ、Pi自体の電源も落とす(curses.wrapper()が
+    # 端末の状態を正常に戻した"後"に行う)。モニター無し運用では、ここで
+    # 自動的に電源を落とさないと、bashに戻っても画面を見ずにコマンドを
+    # 打つ手段が無いため。sudoersで /usr/sbin/shutdown だけパスワード
+    # 無し実行を許可してある(それ以外のsudoコマンドは今まで通り
+    # パスワードが必要)。
+    if want_poweroff:
+        subprocess.run(["sudo", "/usr/sbin/shutdown", "-h", "now"])
