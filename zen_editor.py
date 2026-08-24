@@ -185,14 +185,40 @@ class EPaperWriter:
             else:
                 time.sleep(0.2)
 
+    def _wrap_for_epaper(self, text, draw, max_width_px):
+        """1行のテキストを、実際のフォントのピクセル幅を測りながら
+        max_width_px に収まるよう複数行に折り返す。全角/半角が混在しても、
+        文字数ではなく実測のピクセル幅で判定するので正確。"""
+        if not text:
+            return [""]
+        lines = []
+        current = ""
+        for ch in text:
+            test = current + ch
+            w = draw.textlength(test, font=self.font)
+            if w > max_width_px and current:
+                lines.append(current)
+                current = ch
+            else:
+                current = test
+        lines.append(current)
+        return lines
+
     def _draw(self, lines):
         try:
             self.busy = True
             _epaper_log("_draw開始")
-            img = Image.new('RGB', (self.epd.height, self.epd.width), self.epd.WHITE)
+            canvas_w, canvas_h = self.epd.height, self.epd.width
+            img = Image.new('RGB', (canvas_w, canvas_h), self.epd.WHITE)
             draw = ImageDraw.Draw(img)
-            y = 8
+            # 文字が画面幅を超える場合、切れて消えるのではなく折り返して
+            # 表示する(ユーザー要望)。
+            max_width_px = max(canvas_w - 16, 10)
+            wrapped = []
             for line in lines:
+                wrapped.extend(self._wrap_for_epaper(line, draw, max_width_px))
+            y = 8
+            for line in wrapped:
                 draw.text((8, y), line, font=self.font, fill=self.epd.BLACK)
                 y += 30
             self.epd.display(self.epd.getbuffer(img))
@@ -323,7 +349,7 @@ class ZenEditor:
         # ---- 日本語入力(ローマ字→ひらがな)の状態 ----
         # 漢字変換はローカルLLM(ai_convert.py)にCtrl+Gでまとめて任せる方式のため、
         # ここではローマ字→ひらがなのライブ変換だけを担当する。
-        self.skk_enabled = False       # Ctrl+Kで切り替え。ONの間はローマ字がその場でひらがなになる
+        self.skk_enabled = True        # Ctrl+Kで切り替え。ONの間はローマ字がその場でひらがなになる。起動時から常にON
         self.romaji_buf = ""           # 変換待ちのローマ字断片
 
         curses.curs_set(1)
