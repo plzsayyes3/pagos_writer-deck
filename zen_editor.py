@@ -73,6 +73,7 @@ def wrap_line_with_offsets(text, width):
 HOME = os.path.expanduser("~")
 INBOX_DIR = os.path.join(HOME, "mynotebook", "00_inbox")
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+LOGO_PATH = os.path.join(SCRIPT_DIR, "logo.png")
 
 EPD_LIB_DIR = os.path.join(
     HOME, "e-Paper", "E-paper_Separate_Program", "3in7_e-Paper_G",
@@ -256,6 +257,23 @@ class EPaperWriter:
                 self.epd.sleep()
             except Exception:
                 pass
+
+
+def _draw_logo_image(epd, Image, ImageDraw, ImageFont, sub_text):
+    """logo.png(ユーザー提供のPAGOSロゴ画像、4色パネル用に減色済み)を
+    読み込み、下の余白にsub_textを描いて表示する。起動時のスプラッシュ
+    画面(show_splash)と終了時のシャットダウン画面(draw_shutdown_image)
+    の両方から共通で使う。"""
+    img = Image.open(LOGO_PATH).convert("RGB")
+    draw = ImageDraw.Draw(img)
+    if sub_text:
+        font = ImageFont.truetype(FONT_PATH, 16)
+        bbox = draw.textbbox((0, 0), sub_text, font=font)
+        tw = bbox[2] - bbox[0]
+        x = max(0, (img.width - tw) // 2)
+        y = img.height - 28
+        draw.text((x, y), sub_text, font=font, fill=epd.BLACK)
+    epd.display(epd.getbuffer(img))
 
 
 class GitSync:
@@ -545,7 +563,11 @@ class ZenEditor:
         簡単なロゴ画面を出し、Enterが押されるまで編集を始めない。
         e-paper側にも同じ内容を一度出しておく。"""
         splash_lines = ["パゴス", "", "Enterで書き始める"]
-        self.epaper.request(splash_lines)
+        self.epaper.request_custom(
+            lambda epd, Image, ImageDraw, ImageFont: _draw_logo_image(
+                epd, Image, ImageDraw, ImageFont, "Enterで書き始める"
+            )
+        )
 
         self.stdscr.erase()
         h, w = self.stdscr.getmaxyx()
@@ -577,76 +599,11 @@ class ZenEditor:
         if not self.epaper.enabled:
             return
 
-        def _draw(epd, Image, ImageDraw, ImageFont):
-            w, h = epd.height, epd.width  # 描画キャンバスは(240, 416)想定
-            img = Image.new('RGB', (w, h), epd.WHITE)
-            draw = ImageDraw.Draw(img)
-            cx, cy = w // 2, 150
-            shell_r = 80
-
-            # 甲羅: 8分割の扇形を赤/黄交互に塗る(4色パネルの色をそのまま活かす)
-            n = 8
-            for i in range(n):
-                start = i * (360 / n) - 90
-                end = start + (360 / n)
-                color = epd.RED if i % 2 == 0 else epd.YELLOW
-                draw.pieslice(
-                    [cx - shell_r, cy - shell_r, cx + shell_r, cy + shell_r],
-                    start, end, fill=color, outline=epd.BLACK,
-                )
-            draw.ellipse(
-                [cx - shell_r, cy - shell_r, cx + shell_r, cy + shell_r],
-                outline=epd.BLACK, width=4,
+        self.epaper.request_custom(
+            lambda epd, Image, ImageDraw, ImageFont: _draw_logo_image(
+                epd, Image, ImageDraw, ImageFont, "電源を切って大丈夫です"
             )
-
-            # 中心の白丸+羽根ペン
-            inner_r = 42
-            draw.ellipse(
-                [cx - inner_r, cy - inner_r, cx + inner_r, cy + inner_r],
-                fill=epd.WHITE, outline=epd.BLACK, width=3,
-            )
-            draw.line([cx - 18, cy + 22, cx + 18, cy - 22], fill=epd.BLACK, width=4)
-            draw.polygon(
-                [(cx + 18, cy - 22), (cx + 2, cy - 10),
-                 (cx - 6, cy - 2), (cx + 6, cy - 6), (cx + 18, cy - 22)],
-                fill=epd.BLACK,
-            )
-
-            # 頭
-            head_r = 16
-            draw.ellipse(
-                [cx - head_r, cy - shell_r - int(head_r * 1.5),
-                 cx + head_r, cy - shell_r + int(head_r * 0.3)],
-                fill=epd.WHITE, outline=epd.BLACK, width=3,
-            )
-            # 4本足
-            leg_r = 16
-            offs = int(shell_r * 0.75)
-            for dx, dy in [(-offs, -offs), (offs, -offs), (-offs, offs), (offs, offs)]:
-                draw.ellipse(
-                    [cx + dx - leg_r, cy + dy - leg_r, cx + dx + leg_r, cy + dy + leg_r],
-                    fill=epd.WHITE, outline=epd.BLACK, width=3,
-                )
-
-            # テキスト
-            font = ImageFont.truetype(FONT_PATH, 36)
-            text = "PAGOS"
-            bbox = draw.textbbox((0, 0), text, font=font)
-            draw.text(
-                (cx - (bbox[2] - bbox[0]) // 2, cy + shell_r + 40),
-                text, font=font, fill=epd.BLACK,
-            )
-            sub_font = ImageFont.truetype(FONT_PATH, 18)
-            sub = "電源を切って大丈夫です"
-            bbox2 = draw.textbbox((0, 0), sub, font=sub_font)
-            draw.text(
-                (cx - (bbox2[2] - bbox2[0]) // 2, cy + shell_r + 95),
-                sub, font=sub_font, fill=epd.BLACK,
-            )
-
-            epd.display(epd.getbuffer(img))
-
-        self.epaper.request_custom(_draw)
+        )
 
     # ---- メインループ ----
     def run(self):
