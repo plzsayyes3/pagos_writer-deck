@@ -14,14 +14,20 @@ Dockerのようにソフトウェアだけで検証することもできない(G
 「一発で動作確認済み」という保証はできない。** 実機に届いたら、この
 READMEの手順通りに進めて、うまくいかない箇所があれば教えてほしい。
 
-## ハードウェア上の注意(要確認)
+**運用方針(2026-08-24確定)**: 新しいSDカードは用意せず、**V2実験で使った
+`pagos-writer-gui`のSDカードをそのまま流用し、上書きしていく**。
+X11・openbox・fcitx5-mozc・mousepad・xdotool・git deploy鍵は既に
+セットアップ済みのはずなので、以下の手順は**差分だけ**適用すればよい
+(パッケージの再インストールは基本不要、config.txtとX11設定ファイル
+だけがV2(HDMI)からV3(SPI LCD)への変更点)。
+
+## ハードウェア運用方針(確定)
 
 電子ペーパーHATとこのOSOYOO LCDは、どちらもGPIOヘッダーに直挿しする
-HAT型で、どちらもSPIバスを使う。同時に両方を同じPiに物理的に接続する
-場合、ピンの取り合いが起きる可能性がある。**基本方針は、電子ペーパー版
-(pagos-writer)・GUI版V2(pagos-writer-gui)と同様に、別のSDカードを用意し
-「使うときだけ挿し替える」運用を想定している**。同時接続したい場合は
-配線から見直しが必要になる。
+HAT型で、どちらもSPIバスを使うため同時接続はしない。
+**`pagos-writer`(電子ペーパー版)のSDカードはそのまま温存し、
+`pagos-writer-gui`(V2で使った予備SDカード)をV3用に上書きしていく**
+運用で確定。使うときに応じてSDカードごと挿し替える。
 
 ## セットアップ手順
 
@@ -50,31 +56,35 @@ sudo reboot
 ls -la /dev/fb1
 ```
 
-### 3. X11 + openbox + fcitx5-mozc(V2と同じ構成)
+### 3. X11 + openbox + fcitx5-mozc(`pagos-writer-gui`なら大部分は導入済み)
 
-V2実験と同じパッケージ・同じ落とし穴対策を使う:
-
+`pagos-writer-gui`のSDカードをそのまま使う場合、以下のパッケージは
+V2実験で既にインストール済みのはずなので**このコマンドは基本不要**
+(念のため、入っていなければ実行):
 ```bash
 sudo apt install -y xserver-xorg xinit openbox dbus-x11 mousepad \
   fcitx5 fcitx5-mozc fcitx5-frontend-gtk3 x11-xserver-utils git xdotool \
   fonts-vlgothic
 ```
 
-このディレクトリのファイルを配置:
+**設定ファイルはV2(HDMI用)からV3(SPI LCD用)に置き換える必要がある**
+(`.xinitrc`が別物になる。geometryがHDMIの1920x1080基準だったものを
+480x320基準に変更しているため):
 ```bash
 mkdir -p ~/.config/fcitx5/conf ~/.config/openbox
 cp xinitrc ~/.xinitrc
-cp xprofile ~/.xprofile
+cp xprofile ~/.xprofile          # V2と同一内容なので上書きしても実質変化なし
 cp fcitx5_profile ~/.config/fcitx5/profile
 cp fcitx5_conf_wayland.conf ~/.config/fcitx5/conf/wayland.conf
-cp openbox_rc.xml ~/.config/openbox/rc.xml
-cp git_sync.sh ~/git_sync.sh && chmod +x ~/git_sync.sh
+cp openbox_rc.xml ~/.config/openbox/rc.xml   # V2と同一内容
+cp git_sync.sh ~/git_sync.sh && chmod +x ~/git_sync.sh  # V2と同一内容
 sudo cp 99-calibration.conf /usr/share/X11/xorg.conf.d/99-calibration.conf
-touch ~/pagos_gui_draft.md
+touch ~/pagos_gui_draft.md   # 既にあれば不要
 ```
 
-git送信用のデプロイ鍵はV2と同じ手順(この機体専用に新規発行し、
-`mynotebook`リポジトリにWrite権限で追加)。
+git送信用のデプロイ鍵・`~/mynotebook`のクローン・`~/.ssh/config`は
+V2で既に設定済みのはず。`ls ~/mynotebook`と`git -C ~/mynotebook remote -v`
+で生きているか確認するだけでよい(新規発行は不要)。
 
 ### 4. 起動スプラッシュ(パゴス+亀ロゴ)の生成
 
@@ -86,9 +96,9 @@ python3 make_splash.py
 
 ### 5. 自動起動の設定
 
-`bashrc_snippet.txt`の内容を`~/.bashrc`に追記する(既存のCUI版
-自動起動ブロックがあればコメントアウトすること。両方同時には
-起動できない)。
+`bashrc_snippet.txt`の内容を`~/.bashrc`に追記する。V2実験では
+`startx`は毎回手動で実行していた(自動起動は無かった)ので、これは
+V3で新規に追加する部分。
 
 **流れ**: 電源投入 → 自動ログイン(tty1) → `FRAMEBUFFER=/dev/fb1`設定
 → 亀ロゴのスプラッシュをフレームバッファに直接表示(X11起動を待たず
