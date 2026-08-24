@@ -46,7 +46,7 @@ def _log(msg):
     except Exception:
         pass
 
-AI_BACKEND = "gemini"  # "ollama" / "gemini" / "mozc_local"
+AI_BACKEND = "mozc_local"  # "ollama" / "gemini" / "mozc_local"
 
 # ---- Ollama(ローカルLLM)設定 ----
 OLLAMA_HOST = "192.168.1.139"

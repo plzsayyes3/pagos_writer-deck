@@ -382,7 +382,7 @@ class ZenEditor:
 
         self.save(as_new=False)
 
-        self.status = "AI変換中..."
+        self.status = "変換中..."
         self.render()
         try:
             converted = ai_convert.convert_to_kanji(text)
@@ -391,9 +391,9 @@ class ZenEditor:
             self.cx = len(self.lines[self.cy])
             self.dirty = True
             self.save(as_new=False)
-            ai_status = "AI変換成功"
+            ai_status = "変換成功"
         except ai_convert.AiConvertError as e:
-            ai_status = f"AI変換失敗(未変換のまま送信): {e}"
+            ai_status = f"変換失敗(未変換のまま送信): {e}"
 
         # 変換結果をe-paperにも反映する。モニター無しの本番運用では、
         # これが送信前に内容を確認できる唯一の手段になる。
@@ -605,7 +605,7 @@ class ZenEditor:
                     self.save(as_new=False)
                 self.reset_document()
                 self.status = "新しい原稿を書き始めてください"
-            elif code == 7:  # Ctrl+G: AI変換 → 保存 → Git送信 → 新規原稿へ
+            elif code == 7:  # Ctrl+G: 変換 → 保存 → Git送信 → 新規原稿へ
                 self.finalize_and_send()
             elif code == 6:  # Ctrl+F
                 self.search()
@@ -794,7 +794,7 @@ class ZenEditor:
         skk_tag = f"[日本語:{'ON' if self.skk_enabled else 'off'}]"
         if self.skk_enabled and self.romaji_buf:
             skk_tag += f"({self.romaji_buf})"
-        info = f"{fname}{dirty_mark}  [{self.cy+1}:{self.cx+1}]  {skk_tag}  Ctrl+S保存 Ctrl+D画面更新 Ctrl+N新規原稿 Ctrl+G AI変換+送信 Ctrl+K日本語 Ctrl+Q終了"
+        info = f"{fname}{dirty_mark}  [{self.cy+1}:{self.cx+1}]  {skk_tag}  Ctrl+S保存 Ctrl+D画面更新 Ctrl+N新規原稿 Ctrl+G変換+送信 Ctrl+K日本語 Ctrl+Q終了"
         try:
             self.stdscr.addstr(h - 2, 0, info[:w - 1], curses.A_REVERSE)
             self.stdscr.addstr(h - 1, 0, self.status[:w - 1])
