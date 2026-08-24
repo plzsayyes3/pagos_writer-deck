@@ -447,13 +447,30 @@ class ZenEditor:
         self.status = "見つかりませんでした"
 
     def prompt(self, message):
+        # 画面最下行への描画。メッセージが画面幅を超えると、画面右下隅への
+        # 書き込みでncursesが例外を出すことがある(addwstr() returned ERR)。
+        # これでCtrl+Qの確認プロンプト表示自体がクラッシュし、アプリ全体が
+        # 落ちる実例があったため、必ず画面幅に収まるよう切り詰める。
         h, w = self.stdscr.getmaxyx()
+        # 全角文字を考慮した表示幅で切り詰める(1文字ずつ足していき、
+        # 画面幅-1を超える直前で止める)
+        truncated = message
+        while display_width(truncated) > w - 1 and truncated:
+            truncated = truncated[:-1]
+        input_col = min(display_width(truncated), max(w - 1, 0))
+
         curses.echo()
-        self.stdscr.move(h - 1, 0)
-        self.stdscr.clrtoeol()
-        self.stdscr.addstr(h - 1, 0, message)
+        try:
+            self.stdscr.move(h - 1, 0)
+            self.stdscr.clrtoeol()
+            self.stdscr.addstr(h - 1, 0, truncated)
+        except curses.error:
+            pass
         curses.curs_set(1)
-        s = self.stdscr.getstr(h - 1, len(message)).decode("utf-8", "ignore")
+        try:
+            s = self.stdscr.getstr(h - 1, input_col).decode("utf-8", "ignore")
+        except curses.error:
+            s = ""
         curses.noecho()
         return s
 
