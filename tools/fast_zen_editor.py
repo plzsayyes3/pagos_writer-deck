@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Launch zen_editor.py using the GH1 Fast initialization mode.
+"""Launch zen_editor.py using the GH1 Fast initialization and layout modes.
 
-This leaves zen_editor.py unchanged. It monkey-patches the Waveshare EPD
-object so that the editor's existing init() call uses init_Fast(). It also
-applies the GH1-specific 416x240 writer layout.
+This keeps zen_editor.py unchanged. It applies two runtime adaptations:
+1. GH1 init_Fast() for the experimentally measured ~14.6 s full refresh.
+2. GH1-specific text layout from gh1_layout.py.
 
 Run only while zen_editor.py is not already running:
     python3 tools/fast_zen_editor.py
@@ -19,7 +19,7 @@ if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
 import zen_editor
-import gh1_layout
+from tools import gh1_layout
 
 if not zen_editor.EPAPER_OK:
     raise SystemExit(f"e-paper driver unavailable: {zen_editor.EPAPER_ERR}")
@@ -34,7 +34,7 @@ def _fast_init(self):
 # Use the experimentally verified GH1 fast initialization path.
 epd3in7g.EPD.init = _fast_init
 
-# Apply the GH1-specific 416x240 text layout without changing zen_editor.py.
+# Apply the GH1-specific 416x240 text layout without modifying zen_editor.py.
 gh1_layout.apply(zen_editor)
 
 
