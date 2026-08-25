@@ -7,8 +7,9 @@ This keeps zen_editor.py unchanged. It applies three runtime adaptations:
 2. GH1-specific text layout from gh1_layout.py.
 3. Physical かな/英数 key mode control from physical_lang_keys.py.
 
-Run only while zen_editor.py is not already running:
-    python3 tools/fast_zen_editor.py
+Ctrl+K is deliberately reserved for the future Kanji conversion feature; the
+old JP/EN toggle is disabled in this launcher because JP/EN is now controlled
+by the physical かな/英数 keys.
 """
 import curses
 import os
@@ -37,6 +38,13 @@ epd3in7g.EPD.init = _fast_init
 
 # Apply the GH1-specific 416x240 text layout without modifying zen_editor.py.
 gh1_layout.apply(zen_editor)
+
+# JP/EN is now selected by the physical かな/英数 keys. Reserve Ctrl+K for
+# the future Kanji conversion feature rather than toggling input mode.
+def _reserved_skk_toggle(self):
+    self.status = "Ctrl+K: 漢字変換（準備中）"
+
+zen_editor.ZenEditor.skk_toggle = _reserved_skk_toggle
 
 
 def main(stdscr):
