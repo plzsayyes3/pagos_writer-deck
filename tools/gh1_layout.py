@@ -6,13 +6,16 @@ Keeps zen_editor.py unchanged and replaces only the e-paper text renderer and
 push_to_epaper method at runtime. The GH1 is 416x240, so the writer uses nine
 text rows plus one compact status row at the bottom.
 
-Status row: character count, logical line count, Japanese input state,
-save state, and current time.
+Status row is fixed into three zones:
+    left   : character count
+    center : filename or 未保存
+    right  : HH:MM
 """
 
 def apply(zen_editor):
     from PIL import Image, ImageDraw, ImageFont
     from datetime import datetime
+    import os
 
     original_init_epd = zen_editor.EPaperWriter._init_epd
 
@@ -46,23 +49,35 @@ def apply(zen_editor):
                 draw.text((10, y), line, font=font, fill=self.epd.BLACK)
                 y += 23
 
-            # zen_editorから現在の文書情報を受け取る。
             editor = getattr(self, "_layout_editor", None)
             if editor is not None:
                 text = "\n".join(editor.lines)
                 char_count = len(text.replace("\n", ""))
-                line_count = len(editor.lines)
-                jp = "JP" if editor.skk_enabled else "EN"
-                save_state = "*" if editor.dirty else "OK"
+                if editor.filename:
+                    filename = os.path.basename(editor.filename)
+                else:
+                    filename = "未保存"
             else:
                 char_count = sum(len(line) for line in lines)
-                line_count = len(lines)
-                jp = "JP"
-                save_state = "*"
+                filename = "未保存"
 
-            footer = f"{char_count}字 {line_count}行  {jp} {save_state}  {datetime.now().strftime('%H:%M')}"
+            # 固定3分割: 左=文字数 / 中央=ファイル名または未保存 / 右=時刻
             draw.rectangle((0, 218, canvas_w - 1, canvas_h - 1), fill=self.epd.BLACK)
-            draw.text((10, 221), footer, font=footer_font, fill=self.epd.WHITE)
+            footer_y = 221
+            left = f"{char_count}字"
+            right = datetime.now().strftime("%H:%M")
+
+            draw.text((10, footer_y), left, font=footer_font, fill=self.epd.WHITE)
+
+            filename_bbox = draw.textbbox((0, 0), filename, font=footer_font)
+            filename_w = filename_bbox[2] - filename_bbox[0]
+            filename_x = max(10, (canvas_w - filename_w) // 2)
+            draw.text((filename_x, footer_y), filename, font=footer_font, fill=self.epd.WHITE)
+
+            right_bbox = draw.textbbox((0, 0), right, font=footer_font)
+            right_w = right_bbox[2] - right_bbox[0]
+            right_x = max(10, canvas_w - right_w - 10)
+            draw.text((right_x, footer_y), right, font=footer_font, fill=self.epd.WHITE)
 
             self.epd.display(self.epd.getbuffer(img))
             zen_editor._epaper_log("GH1 layout _draw完了")
