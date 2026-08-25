@@ -45,6 +45,9 @@ clock = "23:59"
 bbox = draw.textbbox((0, 0), clock, font=small)
 draw.text((WIDTH - 12 - (bbox[2] - bbox[0]), HEIGHT - 24), clock, font=small, fill="black")
 
+# OSOYOO's panel orientation is 180 degrees from the PIL test canvas.
+img = img.rotate(180)
+
 fd, path = tempfile.mkstemp(prefix="pagos_lcd_", suffix=".png")
 os.close(fd)
 img.save(path)
