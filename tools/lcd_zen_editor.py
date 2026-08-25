@@ -4,7 +4,7 @@
 
 Reuses zen_editor's document, saving, Git, AI conversion, undo, search and
 Ctrl-key behavior, while replacing only the e-paper/curses display with the
-OSOYOO /dev/fb1 LCD.  Physical かな/英数 keys are handled directly here.
+OSOYOO /dev/fb1 LCD. Physical かな/英数 keys are handled directly here.
 """
 import curses
 import ctypes
@@ -49,12 +49,6 @@ def fb_info(fd):
     stride = struct.unpack_from("I", fix, 44)[0]
     return dict(w=x, h=y, xv=xv, yv=yv, bpp=bpp, stride=stride,
                 ro=ro, rl=rl, go=go, gl=gl, bo=bo, bl=bl)
-
-
-def noop_epaper_init(self):
-    self.enabled = False
-    self.error = "LCD mode"
-    self.ready = False
 
 
 class LCDNoopEPaper:
@@ -163,12 +157,10 @@ class LCDZenEditor(zen_editor.ZenEditor):
                     rows.append((idx, part))
             max_rows = max(1, visible_h // 30)
             current_logical = self.cy
-            # Keep cursor line visible; otherwise show the newest lines.
             start = max(0, len(rows) - max_rows)
             for pos, (idx, text) in enumerate(rows):
                 if idx == current_logical:
-                    first = pos
-                    start = min(max(0, first), max(0, len(rows) - max_rows))
+                    start = min(max(0, pos), max(0, len(rows) - max_rows))
                     break
             visible = rows[start:start + max_rows]
 
@@ -184,7 +176,16 @@ class LCDZenEditor(zen_editor.ZenEditor):
                 y += 30
 
             if cursor_y is not None:
-                # Thin vertical cursor; no block to minimize visual noise.
+                # 未確定ローマ字をカーソル位置に表示。
+                # 例: 「きょう」の後に h を押すと「h」が見え、
+                # 続けて a を押すと「は」に確定する。
+                if self.skk_enabled and self.romaji_buf:
+                    d.text(
+                        (cursor_x, cursor_y + 2),
+                        self.romaji_buf,
+                        font=self.small,
+                        fill=(110, 110, 110),
+                    )
                 d.rectangle((cursor_x, cursor_y + 2, cursor_x + 2, cursor_y + 25), fill="black")
 
             sep_y = h - status_h
@@ -203,10 +204,8 @@ class LCDZenEditor(zen_editor.ZenEditor):
             rb = d.textbbox((0, 0), right, font=self.small)
             d.text((w - 8 - (rb[2] - rb[0]), h - 24), right, font=self.small, fill="black")
 
-            # Rotate to match the physical LCD orientation.
             img = img.rotate(180)
 
-            # Vectorized RGB888 -> RGB565 little-endian.
             rgb = np.asarray(img, dtype=np.uint16)
             r = rgb[:, :, 0]
             g = rgb[:, :, 1]
@@ -230,12 +229,10 @@ class LCDZenEditor(zen_editor.ZenEditor):
 
 def physical_lang_listener(editor):
     """Use the verified Mac JIS keys directly from /dev/input/event0.
-    122=かな, 123=英数.  Fail-soft so LCD editor remains usable."""
+    122=かな, 123=英数. Fail-soft so LCD editor remains usable."""
     stop = threading.Event()
     device = "/dev/input/event0"
-    def event_size():
-        return 16 if ctypes.sizeof(ctypes.c_long) == 4 else 24
-    size = event_size()
+    size = 16 if ctypes.sizeof(ctypes.c_long) == 4 else 24
 
     def worker():
         try:
@@ -248,11 +245,13 @@ def physical_lang_listener(editor):
                 try:
                     data = os.read(fd, size * 32)
                 except BlockingIOError:
-                    time.sleep(0.02); continue
+                    time.sleep(0.02)
+                    continue
                 except OSError:
                     break
                 if not data:
-                    time.sleep(0.02); continue
+                    time.sleep(0.02)
+                    continue
                 usable = len(data) - len(data) % size
                 for off in range(0, usable, size):
                     _sec, _usec, typ, code, value = struct.unpack(fmt, data[off:off+size])
@@ -262,6 +261,7 @@ def physical_lang_listener(editor):
                         editor.skk_enabled = True
                         editor.romaji_buf = ""
                         editor.status = "日本語入力: ON"
+                        editor.render()
                     elif code == 123:
                         editor.flush_romaji_buf()
                         editor.skk_enabled = False
@@ -283,8 +283,10 @@ def main(stdscr):
     editor = LCDZenEditor(stdscr)
     stop, th = physical_lang_listener(editor)
     try:
-        editor.run()
-        return editor.want_poweroff
+        # LCD版はスプラッシュ画面のEnter待ちを省き、起動直後からWriterを表示。
+        editor.render()
+        editor.run = lambda: zen_editor.ZenEditor.run(editor)
+        return editor.run()
     finally:
         stop.set()
         th.join(timeout=1)
