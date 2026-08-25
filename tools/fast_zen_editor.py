@@ -2,9 +2,10 @@
 # -*- coding: utf-8 -*-
 """Launch zen_editor.py using the GH1 Fast initialization and layout modes.
 
-This keeps zen_editor.py unchanged. It applies two runtime adaptations:
+This keeps zen_editor.py unchanged. It applies three runtime adaptations:
 1. GH1 init_Fast() for the experimentally measured ~14.6 s full refresh.
 2. GH1-specific text layout from gh1_layout.py.
+3. Physical かな/英数 key mode control from physical_lang_keys.py.
 
 Run only while zen_editor.py is not already running:
     python3 tools/fast_zen_editor.py
@@ -19,7 +20,7 @@ if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
 import zen_editor
-from tools import gh1_layout
+from tools import gh1_layout, physical_lang_keys
 
 if not zen_editor.EPAPER_OK:
     raise SystemExit(f"e-paper driver unavailable: {zen_editor.EPAPER_ERR}")
@@ -42,9 +43,12 @@ def main(stdscr):
     curses.raw()
     zen_editor.disable_flow_control()
     editor = zen_editor.ZenEditor(stdscr)
+    lang_stop, lang_thread = physical_lang_keys.start(editor)
     try:
         editor.run()
     finally:
+        lang_stop.set()
+        lang_thread.join(timeout=1)
         editor.shutdown()
     return editor.want_poweroff
 
