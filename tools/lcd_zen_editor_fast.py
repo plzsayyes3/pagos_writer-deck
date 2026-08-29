@@ -120,7 +120,8 @@ class FastLCDZenEditor(_BaseLCDZenEditor):
             d.text((w - 8 - (rb[2] - rb[0]), h - 24), right,
                    font=self.small, fill="black")
 
-            img = img.rotate(180)
+            # config.txtのdtoverlayにrotate=270を指定済み(2026-08-29確定)。
+            # ドライバ側で正しい向きになるので、ソフト側での回転は不要。
             render_ms = (time.perf_counter() - t0) * 1000.0
 
             t1 = time.perf_counter()

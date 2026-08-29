@@ -232,7 +232,8 @@ class LCDZenEditor(zen_editor.ZenEditor):
             rb = d.textbbox((0, 0), right, font=self.small)
             d.text((w - 8 - (rb[2] - rb[0]), h - 24), right, font=self.small, fill="black")
 
-            img = img.rotate(180)
+            # config.txtのdtoverlayにrotate=270を指定済み(2026-08-29確定)。
+            # ドライバ側で正しい向きになるので、ソフト側での回転は不要。
 
             rgb = np.asarray(img, dtype=np.uint16)
             r = rgb[:, :, 0]
