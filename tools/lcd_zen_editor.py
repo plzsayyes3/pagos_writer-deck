@@ -30,6 +30,32 @@ import zen_editor
 FB = "/dev/fb1"
 FBIOGET_VSCREENINFO = 0x4600
 FBIOGET_FSCREENINFO = 0x4602
+
+# fbcon=map:1 でtty1のコンソールを/dev/fb1にマッピングしていると、
+# カーネル自身のテキスト描画(特に点滅カーソル)がアプリの描画と
+# 同じフレームバッファ上で競合し、画面の一部が点滅して見えるバグの
+# 原因になっていた(2026-08-29実機確認、setterm --cursor offで再現・解消)。
+# アプリ実行中はtty1を「グラフィックモード」にしてカーネルのテキスト
+# 描画そのものを止め、終了時に元に戻す。
+KDSETMODE = 0x4B3A
+KD_TEXT = 0x00
+KD_GRAPHICS = 0x01
+CONSOLE_DEVICE = "/dev/tty1"
+
+
+def _console_graphics_mode(graphics):
+    """tty1のカーネルテキスト描画をon/off。権限が無い・デバイスが無い等の
+    場合は失敗しても構わない(fail-soft、SSH経由のテストでも動くように)。"""
+    try:
+        fd = os.open(CONSOLE_DEVICE, os.O_RDWR)
+    except OSError:
+        return
+    try:
+        fcntl.ioctl(fd, KDSETMODE, KD_GRAPHICS if graphics else KD_TEXT)
+    except OSError:
+        pass
+    finally:
+        os.close(fd)
 FONT_CANDIDATES = [
     os.path.expanduser("~/e-Paper/E-paper_Separate_Program/3in7_e-Paper_G/RaspberryPi_JetsonNano/python/pic/Font.ttc"),
     "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
@@ -98,6 +124,7 @@ zen_editor.ZenEditor.skk_toggle = convert_current_line
 class LCDZenEditor(zen_editor.ZenEditor):
     def __init__(self, stdscr):
         super().__init__(stdscr)
+        _console_graphics_mode(True)
         self.fd = os.open(FB, os.O_RDWR)
         self.fb_info = fb_info(self.fd)
         if self.fb_info["bpp"] != 16:
@@ -120,6 +147,7 @@ class LCDZenEditor(zen_editor.ZenEditor):
             self.mm.close()
         finally:
             os.close(self.fd)
+            _console_graphics_mode(False)
         self.epaper.shutdown()
 
     def push_to_epaper(self):
