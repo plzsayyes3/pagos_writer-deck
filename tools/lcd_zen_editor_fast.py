@@ -11,9 +11,13 @@ hardware-side change is documented separately as a config.txt edit to
 32 MHz, so it can be reverted independently.
 """
 import curses
+import faulthandler
 import os
+import signal
 import sys
+import threading
 import time
+import traceback
 from datetime import datetime
 
 import numpy as np
@@ -33,6 +37,36 @@ PERF = os.environ.get("PAGOS_LCD_PERF", "0") == "1"
 # 切り分けるためのもの。
 FORCE_FULL = os.environ.get("PAGOS_LCD_FORCE_FULL", "0") == "1"
 PERF_LOG = os.path.expanduser("~/pagos_writer-deck/lcd_perf.log")
+ERROR_LOG = os.path.expanduser("~/pagos_writer-deck/lcd_error.log")
+
+
+def _install_diagnostics():
+    """ハング調査用(2026-08-29、実機で原因不明のキー無反応が発生したため追加)。
+    - バックグラウンドスレッド(physical_lang_listenerなど)での未処理例外を
+      lcd_error.logに記録する(通常はスレッドが黙って死ぬだけで気づけない)。
+    - SSH等から `kill -USR1 <pid>` すると、その時点の全スレッドのスタック
+      トレースをlcd_error.logに書き出す(プロセスは終了しない)。ハング時に
+      「どこで止まっているか」を実機を止めずに調べられる。
+    失敗しても致命的ではないのでfail-soft。"""
+    try:
+        log_fp = open(ERROR_LOG, "a", encoding="utf-8")
+    except OSError:
+        return
+    faulthandler.enable(file=log_fp)
+    try:
+        faulthandler.register(signal.SIGUSR1, file=log_fp, all_threads=True)
+    except (AttributeError, ValueError, OSError):
+        pass
+
+    def _thread_excepthook(args):
+        ts = datetime.now().isoformat(timespec="milliseconds")
+        log_fp.write(f"\n[{ts}] 未処理の例外 (thread={args.thread.name}):\n")
+        traceback.print_exception(
+            args.exc_type, args.exc_value, args.exc_traceback, file=log_fp
+        )
+        log_fp.flush()
+
+    threading.excepthook = _thread_excepthook
 
 
 class FastLCDZenEditor(_BaseLCDZenEditor):
@@ -201,6 +235,14 @@ def main(stdscr):
 
 
 if __name__ == "__main__":
-    want_poweroff = curses.wrapper(main)
+    _install_diagnostics()
+    try:
+        want_poweroff = curses.wrapper(main)
+    except Exception:
+        with open(ERROR_LOG, "a", encoding="utf-8") as fp:
+            fp.write(f"\n[{datetime.now().isoformat(timespec='milliseconds')}] "
+                      f"main threadで未処理の例外:\n")
+            traceback.print_exc(file=fp)
+        raise
     if want_poweroff:
         os.system("sudo /usr/sbin/shutdown -h now")
