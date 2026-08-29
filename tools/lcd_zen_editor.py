@@ -315,11 +315,15 @@ def main(stdscr):
         # LCD版はスプラッシュ画面のEnter待ちを省き、起動直後からWriterを表示。
         editor.render()
         editor.run = lambda: zen_editor.ZenEditor.run(editor)
-        return editor.run()
+        editor.run()
     finally:
         stop.set()
         th.join(timeout=1)
         editor.shutdown()
+    # run()自体は何もreturnしないため、ここでeditor.want_poweroffを
+    # 読む(以前はreturn editor.run()としていたため常にNoneになり、
+    # Ctrl+Qを押しても電源が落ちないバグがあった。2026-08-29修正)。
+    return editor.want_poweroff
 
 
 if __name__ == "__main__":
