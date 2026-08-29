@@ -172,7 +172,13 @@ class FastLCDZenEditor(_BaseLCDZenEditor):
 
 
 def main(stdscr):
+    # 順序が重要: curses.raw()が内部でtermiosを上書きするため、
+    # フロー制御(IXON/IXOFF)の無効化は必ずcurses.raw()の"後"に行う。
+    # 電子ペーパー版(zen_editor.py)にはこの処理があるが、LCD版には
+    # 無かった。物理コンソール(SSHのptyとは違う)では、これが無いと
+    # 入力が正しく通らないことがある。
     curses.raw()
+    zen_editor.disable_flow_control()
     curses.noecho()
     curses.curs_set(0)
     stdscr.keypad(True)
