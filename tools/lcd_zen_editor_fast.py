@@ -28,6 +28,10 @@ from lcd_zen_editor import physical_lang_listener
 import zen_editor
 
 PERF = os.environ.get("PAGOS_LCD_PERF", "0") == "1"
+# 診断用: PAGOS_LCD_FORCE_FULL=1 で部分更新を無効化し、毎回フル画面を
+# 書き込む。表示が途中で切れる不具合が部分更新側のバグかどうかを
+# 切り分けるためのもの。
+FORCE_FULL = os.environ.get("PAGOS_LCD_FORCE_FULL", "0") == "1"
 PERF_LOG = os.path.expanduser("~/pagos_writer-deck/lcd_perf.log")
 
 
@@ -126,7 +130,7 @@ class FastLCDZenEditor(_BaseLCDZenEditor):
             current = packed.astype("<u2")
             pack_ms = (time.perf_counter() - t1) * 1000.0
 
-            if self._shadow is None or self._shadow.shape != current.shape:
+            if FORCE_FULL or self._shadow is None or self._shadow.shape != current.shape:
                 y0, y1, x0, x1 = 0, h, 0, w
                 mode = "full"
             else:
